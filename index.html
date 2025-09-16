@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supermarket Customer Behavior Dashboard</title>
+    <!-- Tailwind CSS CDN for modern, responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        .data-source-btn {
+            @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300;
+        }
+        .data-source-btn-active {
+            @apply bg-indigo-600 text-white shadow-lg;
+        }
+        .data-source-btn-inactive {
+            @apply bg-gray-200 text-gray-700 hover:bg-gray-300;
+        }
+        #loading-indicator {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+        .loader {
+            border: 6px solid #f3f3f3; /* Light grey */
+            border-top: 6px solid #6366f1; /* Indigo */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator">
+        <div class="loader"></div>
+    </div>
+
+    <!-- Main Dashboard Container -->
+    <div class="container mx-auto max-w-7xl bg-white rounded-3xl shadow-xl overflow-hidden p-6 sm:p-10">
+
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Supermarket Customer Analytics Dashboard</h1>
+            <p class="mt-2 text-lg text-gray-500">Analyze product demand, purchase timings, and profitability.</p>
+        </header>
+
+        <!-- Data Source Selection -->
+        <section class="mb-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <h2 class="text-xl font-semibold text-gray-700">Choose a Data Source:</h2>
+            <button id="sql-data-btn" class="data-source-btn data-source-btn-active">
+                Use SQL Database
+            </button>
+            <label for="excel-file" class="data-source-btn data-source-btn-inactive cursor-pointer">
+                Load from CSV/Excel
+                <input type="file" id="excel-file" class="hidden" accept=".csv">
+            </label>
+        </section>
+
+        <!-- Key Metrics Section -->
+        <section id="key-metrics" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
+            <!-- Total Transactions Card -->
+            <div class="bg-indigo-100 p-6 rounded-2xl shadow-md border border-indigo-200">
+                <p class="text-lg font-medium text-indigo-700">Total Transactions</p>
+                <p id="total-transactions" class="text-3xl font-bold mt-1 text-indigo-900">0</p>
+            </div>
+            <!-- Total Revenue Card -->
+            <div class="bg-lime-100 p-6 rounded-2xl shadow-md border border-lime-200">
+                <p class="text-lg font-medium text-lime-700">Total Revenue</p>
+                <p id="total-revenue" class="text-3xl font-bold mt-1 text-lime-900">₹0</p>
+            </div>
+            <!-- Most Popular Product Card -->
+            <div class="bg-emerald-100 p-6 rounded-2xl shadow-md border border-emerald-200">
+                <p class="text-lg font-medium text-emerald-700">Top-Selling Product</p>
+                <p id="top-product" class="text-xl font-bold mt-1 text-emerald-900 truncate">N/A</p>
+            </div>
+            <!-- Peak Hour Card -->
+            <div class="bg-amber-100 p-6 rounded-2xl shadow-md border border-amber-200">
+                <p class="text-lg font-medium text-amber-700">Peak Purchase Hour</p>
+                <p id="peak-hour" class="text-3xl font-bold mt-1 text-amber-900">N/A</p>
+            </div>
+            <!-- Average Items per Transaction Card -->
+            <div class="bg-rose-100 p-6 rounded-2xl shadow-md border border-rose-200">
+                <p class="text-lg font-medium text-rose-700">Avg. Items per Transaction</p>
+                <p id="avg-items" class="text-3xl font-bold mt-1 text-rose-900">0</p>
+            </div>
+        </section>
+
+        <!-- Charts Section -->
+        <section id="charts-section" class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            <!-- Top 10 Products Chart -->
+            <div class="bg-gray-50 p-6 rounded-2xl shadow-lg border border-gray-200">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-700">Top 10 Products by Demand</h2>
+                <canvas id="top-products-chart"></canvas>
+            </div>
+            <!-- Transactions by Time of Day Chart -->
+            <div class="bg-gray-50 p-6 rounded-2xl shadow-lg border border-gray-200">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-700">Transactions by Time of Day</h2>
+                <canvas id="transactions-chart"></canvas>
+            </div>
+            <!-- Product Category Distribution Chart -->
+            <div class="lg:col-span-2 bg-gray-50 p-6 rounded-2xl shadow-lg border border-gray-200">
+                <h2 class="text-2xl font-semibold mb-4 text-gray-700">Product Category Distribution</h2>
+                <div class="w-full h-80 flex items-center justify-center">
+                    <canvas id="category-chart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Detailed Data Table Section -->
+        <section id="data-table-section">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-700">All Transactions</h2>
+            <div class="overflow-x-auto bg-gray-50 rounded-2xl shadow-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Name</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (₹)</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transaction-table-body" class="bg-white divide-y divide-gray-200">
+                        <!-- Table data will be injected here by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const sqlDataBtn = document.getElementById('sql-data-btn');
+            const excelFileBtn = document.getElementById('excel-file');
+            const loadingIndicator = document.getElementById('loading-indicator');
+
+            // Mock Data that would be fetched from a SQL database
+            const mockSQLData = [
+                { id: 'T001', product: 'Milk', category: 'Dairy', quantity: 2, price: 65.00, timestamp: '2024-05-15T08:30:00' },
+                { id: 'T002', product: 'Aata (Flour)', category: 'Pantry', quantity: 1, price: 350.00, timestamp: '2024-05-15T09:15:00' },
+                { id: 'T003', product: 'Eggs', category: 'Dairy', quantity: 12, price: 90.00, timestamp: '2024-05-15T11:05:00' },
+                { id: 'T004', product: 'Onions', category: 'Produce', quantity: 5, price: 40.00, timestamp: '2024-05-15T12:45:00' },
+                { id: 'T005', product: 'Chicken', category: 'Meat', quantity: 1, price: 250.00, timestamp: '2024-05-15T13:20:00' },
+                { id: 'T006', product: 'Milk', category: 'Dairy', quantity: 1, price: 65.00, timestamp: '2024-05-15T14:10:00' },
+                { id: 'T007', product: 'Yogurt', category: 'Dairy', quantity: 4, price: 30.00, timestamp: '2024-05-15T14:15:00' },
+                { id: 'T008', product: 'Chai Masala', category: 'Pantry', quantity: 1, price: 150.00, timestamp: '2024-05-15T15:00:00' },
+                { id: 'T009', product: 'Bread', category: 'Bakery', quantity: 2, price: 35.00, timestamp: '2024-05-15T15:30:00' },
+                { id: 'T010', product: 'Bananas', category: 'Produce', quantity: 3, price: 25.00, timestamp: '2024-05-15T16:00:00' },
+                { id: 'T011', product: 'Dal (Lentils)', category: 'Pantry', quantity: 1, price: 120.00, timestamp: '2024-05-15T16:45:00' },
+                { id: 'T012', product: 'Potatoes', category: 'Produce', quantity: 10, price: 30.00, timestamp: '2024-05-15T17:00:00' },
+                { id: 'T013', product: 'Paneer (Cottage Cheese)', category: 'Dairy', quantity: 1, price: 180.00, timestamp: '2024-05-15T18:30:00' },
+                { id: 'T014', product: 'Mutton', category: 'Meat', quantity: 1, price: 500.00, timestamp: '2024-05-15T19:00:00' },
+                { id: 'T015', product: 'Biscuits', category: 'Snacks', quantity: 1, price: 45.00, timestamp: '2024-05-15T19:30:00' },
+                { id: 'T016', product: 'Milk', category: 'Dairy', quantity: 2, price: 65.00, timestamp: '2024-05-15T20:00:00' },
+                { id: 'T017', product: 'Tomatoes', category: 'Produce', quantity: 4, price: 50.00, timestamp: '2024-05-15T20:30:00' },
+                { id: 'T018', product: 'Rice', category: 'Pantry', quantity: 1, price: 250.00, timestamp: '2024-05-15T21:00:00' },
+                { id: 'T019', product: 'Pav (Bun)', category: 'Bakery', quantity: 1, price: 20.00, timestamp: '2024-05-15T21:30:00' },
+                { id: 'T020', product: 'Chips', category: 'Snacks', quantity: 1, price: 20.00, timestamp: '2024-05-15T22:00:00' },
+                { id: 'T021', product: 'Milk', category: 'Dairy', quantity: 1, price: 65.00, timestamp: '2024-05-15T08:45:00' },
+                { id: 'T022', product: 'Chocolate', category: 'Snacks', quantity: 3, price: 50.00, timestamp: '2024-05-15T15:35:00' },
+                { id: 'T023', product: 'Water', category: 'Beverages', quantity: 6, price: 20.00, timestamp: '2024-05-15T17:15:00' },
+                { id: 'T024', product: 'Milk', category: 'Dairy', quantity: 1, price: 65.00, timestamp: '2024-05-15T18:00:00' },
+                { id: 'T025', product: 'Coffee', category: 'Beverages', quantity: 1, price: 300.00, timestamp: '2024-05-15T09:00:00' },
+                { id: 'T026', product: 'Milk', category: 'Dairy', quantity: 2, price: 65.00, timestamp: '2024-05-15T10:00:00' }
+            ];
+
+            let charts = {}; // Object to hold chart instances for updating
+
+            // Main function to render the dashboard
+            function renderDashboard(data) {
+                const insights = analyzeData(data);
+                renderKeyMetrics(insights);
+                renderCharts(insights);
+                populateTable(data);
+            }
+            
+            // 1. Analyze the data and get key insights
+            function analyzeData(data) {
+                const totalTransactions = data.length;
+                let totalItems = 0;
+                let totalRevenue = 0;
+                const productDemand = {};
+                const transactionsByHour = {};
+                const categoryDistribution = {};
+
+                data.forEach(item => {
+                    totalItems += parseFloat(item.quantity);
+                    totalRevenue += parseFloat(item.quantity) * parseFloat(item.price);
+                    
+                    // Count product demand
+                    productDemand[item.product] = (productDemand[item.product] || 0) + parseFloat(item.quantity);
+                    
+                    // Count transactions by hour
+                    const hour = new Date(item.timestamp).getHours();
+                    transactionsByHour[hour] = (transactionsByHour[hour] || 0) + 1;
+                    
+                    // Count category distribution
+                    categoryDistribution[item.category] = (categoryDistribution[item.category] || 0) + parseFloat(item.quantity);
+                });
+
+                const topProduct = Object.keys(productDemand).reduce((a, b) => productDemand[a] > productDemand[b] ? a : b, null);
+                const peakHour = Object.keys(transactionsByHour).reduce((a, b) => transactionsByHour[a] > transactionsByHour[b] ? a : b, null);
+                const avgItems = totalTransactions > 0 ? (totalItems / totalTransactions).toFixed(2) : 0;
+                
+                return {
+                    totalTransactions,
+                    totalRevenue: totalRevenue.toFixed(2),
+                    topProduct,
+                    peakHour,
+                    avgItems,
+                    productDemand,
+                    transactionsByHour,
+                    categoryDistribution
+                };
+            }
+
+            // 2. Render Key Metrics
+            function renderKeyMetrics(insights) {
+                document.getElementById('total-transactions').textContent = insights.totalTransactions;
+                document.getElementById('total-revenue').textContent = `₹${insights.totalRevenue}`;
+                document.getElementById('top-product').textContent = insights.topProduct || 'N/A';
+                document.getElementById('peak-hour').textContent = insights.peakHour ? `${insights.peakHour}:00 - ${parseInt(insights.peakHour) + 1}:00` : 'N/A';
+                document.getElementById('avg-items').textContent = insights.avgItems;
+            }
+
+            // 3. Render Charts using Chart.js
+            function renderCharts(insights) {
+                // Destroy existing charts to prevent stacking
+                for (const chartName in charts) {
+                    if (charts[chartName]) {
+                        charts[chartName].destroy();
+                    }
+                }
+
+                // Top 10 Products Chart (Bar Chart)
+                const sortedProducts = Object.entries(insights.productDemand).sort(([, a], [, b]) => b - a).slice(0, 10);
+                const topProductLabels = sortedProducts.map(([product]) => product);
+                const topProductData = sortedProducts.map(([, quantity]) => quantity);
+
+                charts.topProducts = new Chart(document.getElementById('top-products-chart'), {
+                    type: 'bar',
+                    data: {
+                        labels: topProductLabels,
+                        datasets: [{
+                            label: 'Total Items Sold',
+                            data: topProductData,
+                            backgroundColor: '#4f46e5',
+                            borderColor: '#3730a3',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: '#e5e7eb' } },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+
+                // Transactions by Time of Day (Line Chart)
+                const hours = Array.from({ length: 24 }, (_, i) => i);
+                const hourlyData = hours.map(h => insights.transactionsByHour[h] || 0);
+                
+                charts.transactions = new Chart(document.getElementById('transactions-chart'), {
+                    type: 'line',
+                    data: {
+                        labels: hours.map(h => `${h}:00`),
+                        datasets: [{
+                            label: 'Transactions',
+                            data: hourlyData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                            tension: 0.4,
+                            fill: true,
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false }, title: { display: false } },
+                        scales: { y: { beginAtZero: true, grid: { color: '#e5e7eb' } }, x: { grid: { display: false } } }
+                    }
+                });
+
+                // Product Category Distribution (Pie Chart)
+                const categoryLabels = Object.keys(insights.categoryDistribution);
+                const categoryData = Object.values(insights.categoryDistribution);
+                const categoryColors = [
+                    '#facc15', '#f472b6', '#34d399', '#6366f1', '#fb923c', '#d946ef', '#22d3ee', '#ef4444'
+                ];
+
+                charts.category = new Chart(document.getElementById('category-chart'), {
+                    type: 'pie',
+                    data: {
+                        labels: categoryLabels,
+                        datasets: [{
+                            data: categoryData,
+                            backgroundColor: categoryLabels.map((_, i) => categoryColors[i % categoryColors.length]),
+                            borderColor: '#ffffff',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                align: 'center',
+                                labels: {
+                                    boxWidth: 20
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed;
+                                        const total = context.dataset.data.reduce((sum, current) => sum + current, 0);
+                                        const percentage = ((value / total) * 100).toFixed(1) + '%';
+                                        return `${label}: ${value} (${percentage})`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 4. Populate the data table
+            function populateTable(data) {
+                const tableBody = document.getElementById('transaction-table-body');
+                tableBody.innerHTML = ''; // Clear existing data
+
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50 transition-colors duration-150';
+                    const time = new Date(item.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.id}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.product}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.category}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.quantity}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹${parseFloat(item.price).toFixed(2)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${time}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            // Event listener for SQL button
+            sqlDataBtn.addEventListener('click', () => {
+                loadingIndicator.style.display = 'block';
+                // Simulate network latency for a realistic experience
+                setTimeout(() => {
+                    renderDashboard(mockSQLData);
+                    loadingIndicator.style.display = 'none';
+                    // Update button states
+                    sqlDataBtn.classList.add('data-source-btn-active');
+                    sqlDataBtn.classList.remove('data-source-btn-inactive');
+                    excelFileBtn.closest('label').classList.remove('data-source-btn-active');
+                    excelFileBtn.closest('label').classList.add('data-source-btn-inactive');
+                }, 1000);
+            });
+
+            // Event listener for Excel file input
+            excelFileBtn.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    loadingIndicator.style.display = 'block';
+                    Papa.parse(file, {
+                        header: true,
+                        dynamicTyping: true,
+                        complete: (results) => {
+                            const parsedData = results.data.map(row => ({
+                                id: row.id,
+                                product: row.product,
+                                category: row.category,
+                                quantity: parseFloat(row.quantity),
+                                price: parseFloat(row.price),
+                                timestamp: row.timestamp
+                            }));
+                            renderDashboard(parsedData);
+                            loadingIndicator.style.display = 'none';
+                            // Update button states
+                            sqlDataBtn.classList.remove('data-source-btn-active');
+                            sqlDataBtn.classList.add('data-source-btn-inactive');
+                            excelFileBtn.closest('label').classList.add('data-source-btn-active');
+                            excelFileBtn.closest('label').classList.remove('data-source-btn-inactive');
+                        }
+                    });
+                }
+            });
+
+            // Initial load with mock SQL data
+            renderDashboard(mockSQLData);
+        });
+    </script>
+</body>
+</html>
