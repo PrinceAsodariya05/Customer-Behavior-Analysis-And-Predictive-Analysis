@@ -737,7 +737,7 @@ select.form-control {
     format('woff2');
 }
 
-/* END PERPLEXITY DESIGN SYSTEM */
+
 /* Enhanced Customer Peak Time Analytics Application Styles */
 
 /* Base Styles with Enhanced Typography */
@@ -750,6 +750,7 @@ select.form-control {
 html {
   font-size: 14px;
   scroll-behavior: smooth;
+  height: 100%;
 }
 
 body {
@@ -757,6 +758,7 @@ body {
   color: var(--color-text);
   transition: all var(--duration-normal) var(--ease-standard);
   overflow-x: hidden;
+  height: 100%;
 }
 
 /* Enhanced Header with Bright Theme */

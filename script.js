@@ -1,7 +1,3 @@
-// Enhanced Customer Peak Time Analytics Application
-// FreshMart SuperStore - Version 3.0
-
-// Global Application State - Starting with Empty Data
 const AppState = {
     currentSection: 'dashboard',
     data: {
@@ -27,7 +23,7 @@ const AppState = {
     }
 };
 
-// Enhanced Utility Functions
+//Utility Functions
 const Utils = {
     formatCurrency: (amount) => {
         try {
